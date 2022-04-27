@@ -1,3 +1,5 @@
+Mirror of https://github.com/visrealm/vrEmu6502.git so that I can use it as a
+submodule in my projects. I have changed `/.gitignore` to only ignore `*.o`.
 
 # vrEmu6502
 
