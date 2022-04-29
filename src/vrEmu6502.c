@@ -16,7 +16,9 @@
 #include <assert.h>
 
 
+#if 0 // Nick
 #pragma warning(disable : 4100)
+#endif
 
  /*
   * address mode function prototype
@@ -315,6 +317,65 @@ static void beginInterrupt(VrEmu6502* vr6502, uint16_t addr)
  *
  * a single clock tick
  */
+#if 1 // Nick
+VR_EMU_6502_DLLEXPORT int vrEmu6502Run(VrEmu6502* vr6502, int n, int *cycles)
+{
+  int i, j = 0;
+  for (i = 0; i < n; ++i) {
+    if (vr6502->jam)
+      break;
+
+    /* interrupts are ignored during the 1-cycle nops*/
+    if (vr6502->opcodes[vr6502->currentOpcode].cycles != 1)
+    {
+      /* check NMI */
+      if (vr6502->nmiPin == IntRequested && !vr6502->inNmi)
+      {
+        vr6502->inNmi = 1;
+        beginInterrupt(vr6502, NMI_VEC);
+        continue;
+      }
+
+      /* check INT */
+      if (vr6502->intPin == IntRequested)
+      {
+        if (!testBit(vr6502, BitI))
+        {
+          beginInterrupt(vr6502, INT_VEC);
+          continue;
+        }
+        else if (vr6502->wai)
+        {
+          vr6502->wai = 0;
+        }
+      }
+    }
+    
+    if (vr6502->wai)
+      break;
+
+    vr6502->currentOpcodeAddr = vr6502->pc++;
+    vr6502->currentOpcode = vr6502->readFn(vr6502->currentOpcodeAddr, false);
+
+    /* find the instruction in the table */
+    const vrEmu6502Opcode* opcode = &vr6502->opcodes[vr6502->currentOpcode];
+
+    /* set cycles here as they may be adjusted by addressing mode */
+    j += opcode->cycles;
+
+    /* execute the instruction */
+    opcode->instruction(vr6502, opcode->addrMode);
+  }
+
+  *cycles = j;
+  return i;
+}
+
+VR_EMU_6502_DLLEXPORT int vrEmu6502Jam(VrEmu6502* vr6502)
+{
+  vr6502->jam = 1;
+} 
+#else
 VR_EMU_6502_DLLEXPORT void vrEmu6502Tick(VrEmu6502* vr6502)
 {
   if (vr6502->jam) return;
@@ -365,6 +426,7 @@ VR_EMU_6502_DLLEXPORT void vrEmu6502Tick(VrEmu6502* vr6502)
 
   if (vr6502->step) --vr6502->step;
 }
+#endif
 
 
 /* ------------------------------------------------------------------
@@ -766,7 +828,7 @@ static uint16_t rel(VrEmu6502* vr6502)
  */
 static uint16_t xin(VrEmu6502* vr6502)
 {
-  return read16Wrapped(vr6502, vr6502->zpBase + vr6502->readFn(vr6502->pc++, false) + vr6502->ix & 0xff);
+  return read16Wrapped(vr6502, (vr6502->zpBase + vr6502->readFn(vr6502->pc++, false) + vr6502->ix) & 0xff);
 }
 
 /*
