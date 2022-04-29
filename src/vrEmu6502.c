@@ -371,7 +371,7 @@ VR_EMU_6502_DLLEXPORT int vrEmu6502Run(VrEmu6502* vr6502, int n, int *cycles)
   return i;
 }
 
-VR_EMU_6502_DLLEXPORT int vrEmu6502Jam(VrEmu6502* vr6502)
+VR_EMU_6502_DLLEXPORT void vrEmu6502Jam(VrEmu6502* vr6502)
 {
   vr6502->jam = 1;
 } 
