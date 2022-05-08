@@ -488,11 +488,29 @@ VR_EMU_6502_DLLEXPORT uint8_t vrEmu6502GetAcc(VrEmu6502* vr6502)
 
 /* ------------------------------------------------------------------
  *
+ * return the accumulator
+ */
+VR_EMU_6502_DLLEXPORT void vrEmu6502SetAcc(VrEmu6502* vr6502, uint8_t ac)
+{
+  vr6502->ac = ac;
+}
+
+/* ------------------------------------------------------------------
+ *
  * return the x index register
  */
 VR_EMU_6502_DLLEXPORT uint8_t vrEmu6502GetX(VrEmu6502* vr6502)
 {
   return vr6502->ix;
+}
+
+/* ------------------------------------------------------------------
+ *
+ * return the x index register
+ */
+VR_EMU_6502_DLLEXPORT void vrEmu6502SetX(VrEmu6502* vr6502, uint8_t ix)
+{
+  vr6502->ix = ix;
 }
 
 /* ------------------------------------------------------------------
@@ -506,6 +524,15 @@ VR_EMU_6502_DLLEXPORT uint8_t vrEmu6502GetY(VrEmu6502* vr6502)
 
 /* ------------------------------------------------------------------
  *
+ * set the y index register
+ */
+VR_EMU_6502_DLLEXPORT void vrEmu6502SetY(VrEmu6502* vr6502, uint8_t iy)
+{
+  vr6502->iy = iy;
+}
+
+/* ------------------------------------------------------------------
+ *
  * return the processor status register
  */
 VR_EMU_6502_DLLEXPORT uint8_t vrEmu6502GetStatus(VrEmu6502* vr6502)
@@ -515,11 +542,29 @@ VR_EMU_6502_DLLEXPORT uint8_t vrEmu6502GetStatus(VrEmu6502* vr6502)
 
 /* ------------------------------------------------------------------
  *
+ * set the processor status register
+ */
+VR_EMU_6502_DLLEXPORT void vrEmu6502SetStatus(VrEmu6502* vr6502, uint8_t flags)
+{
+  vr6502->flags = flags;
+}
+
+/* ------------------------------------------------------------------
+ *
  * return the stack pointer register
  */
 VR_EMU_6502_DLLEXPORT uint8_t vrEmu6502GetStackPointer(VrEmu6502* vr6502)
 {
   return vr6502->sp;
+}
+
+/* ------------------------------------------------------------------
+ *
+ * set the stack pointer register
+ */
+VR_EMU_6502_DLLEXPORT void vrEmu6502SetStackPointer(VrEmu6502* vr6502, uint8_t sp)
+{
+  vr6502->sp = sp;
 }
 
 /* ------------------------------------------------------------------
