@@ -318,10 +318,63 @@ static void beginInterrupt(VrEmu6502* vr6502, uint16_t addr)
  * a single clock tick
  */
 #if 1 // Nick
-VR_EMU_6502_DLLEXPORT int vrEmu6502Run(VrEmu6502* vr6502, int n, int *cycles)
+VR_EMU_6502_DLLEXPORT int vrEmu6502RunInstrs(VrEmu6502* vr6502, int n, int *cycles)
 {
   int i, j = 0;
   for (i = 0; i < n; ++i) {
+    if (vr6502->jam)
+      break;
+
+    /* interrupts are ignored during the 1-cycle nops*/
+    if (vr6502->opcodes[vr6502->currentOpcode].cycles != 1)
+    {
+      /* check NMI */
+      if (vr6502->nmiPin == IntRequested && !vr6502->inNmi)
+      {
+        vr6502->inNmi = 1;
+        beginInterrupt(vr6502, NMI_VEC);
+        continue;
+      }
+
+      /* check INT */
+      if (vr6502->intPin == IntRequested)
+      {
+        if (!testBit(vr6502, BitI))
+        {
+          beginInterrupt(vr6502, INT_VEC);
+          continue;
+        }
+        else if (vr6502->wai)
+        {
+          vr6502->wai = 0;
+        }
+      }
+    }
+    
+    if (vr6502->wai)
+      break;
+
+    vr6502->currentOpcodeAddr = vr6502->pc++;
+    vr6502->currentOpcode = vr6502->readFn(vr6502->currentOpcodeAddr, false);
+
+    /* find the instruction in the table */
+    const vrEmu6502Opcode* opcode = &vr6502->opcodes[vr6502->currentOpcode];
+
+    /* set cycles here as they may be adjusted by addressing mode */
+    j += opcode->cycles;
+
+    /* execute the instruction */
+    opcode->instruction(vr6502, opcode->addrMode);
+  }
+
+  *cycles = j;
+  return i;
+}
+
+VR_EMU_6502_DLLEXPORT int vrEmu6502RunCycles(VrEmu6502* vr6502, int n, int *cycles)
+{
+  int i = 0, j = 0;
+  while (j < n) {
     if (vr6502->jam)
       break;
 

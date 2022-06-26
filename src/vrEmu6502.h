@@ -161,7 +161,8 @@ VR_EMU_6502_DLLEXPORT void vrEmu6502Reset(VrEmu6502* vr6502);
  * a single clock tick
  */
 #if 1 // Nick
-VR_EMU_6502_DLLEXPORT int vrEmu6502Run(VrEmu6502* vr6502, int n, int *cycles);
+VR_EMU_6502_DLLEXPORT int vrEmu6502RunInstrs(VrEmu6502* vr6502, int n, int *cycles);
+VR_EMU_6502_DLLEXPORT int vrEmu6502RunCycles(VrEmu6502* vr6502, int n, int *cycles);
 VR_EMU_6502_DLLEXPORT void vrEmu6502Jam(VrEmu6502* vr6502);
 VR_EMU_6502_DLLEXPORT void vrEmu6502Unjam(VrEmu6502* vr6502);
 #else
