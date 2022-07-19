@@ -14,7 +14,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
-
+#if 1 // be deterministic
+#include <string.h>
+#endif
 
 #if 0 // Nick
 #pragma warning(disable : 4100)
@@ -225,6 +227,11 @@ VR_EMU_6502_DLLEXPORT VrEmu6502* vrEmu6502New(
   VrEmu6502* vr6502 = (VrEmu6502*)malloc(sizeof(VrEmu6502));
   if (vr6502 != NULL)
   {
+#if 1 // be deterministic
+    memset(vr6502, 0, sizeof(VrEmu6502));
+    vr6502->sp = 0xff;
+#endif
+
     vr6502->model = model;
     vr6502->readFn = readFn;
     vr6502->writeFn = writeFn;
