@@ -22,63 +22,6 @@
 #pragma warning(disable : 4100)
 #endif
 
- /*
-  * address mode function prototype
-  */
-typedef uint16_t(*vrEmu6502AddrModeFn)(VrEmu6502*);
-
- /*
-  * instruction function prototype
-  */
-typedef void(*vrEmu6502InstructionFn)(VrEmu6502*, vrEmu6502AddrModeFn);
-
-struct vrEmu6502Opcode
-{
-  const vrEmu6502InstructionFn  instruction;
-  const vrEmu6502AddrModeFn     addrMode;
-  const uint8_t                 cycles;
-};
-typedef struct vrEmu6502Opcode vrEmu6502Opcode;
-
-
-/* ------------------------------------------------------------------
- * PRIVATE DATA STRUCTURE
- */
-struct vrEmu6502_s
-{
-  vrEmu6502Model model;
-  
-  vrEmu6502MemRead readFn;
-  vrEmu6502MemWrite writeFn;
-  
-  vrEmu6502Interrupt intPin;
-  vrEmu6502Interrupt nmiPin;
-
-  uint8_t step;
-  uint8_t inNmi;
-  uint8_t currentOpcode;
-  uint16_t currentOpcodeAddr;
-  uint8_t wai;
-
-  uint16_t pc;
-
-  uint8_t  ac;
-  uint8_t  ix;
-  uint8_t  iy;
-  uint8_t  sp;
-
-  uint8_t  flags;
-
-  uint16_t zpBase;
-  uint16_t spBase;
-  uint16_t tmpAddr;
-  uint8_t jam;
-
-  const vrEmu6502Opcode *opcodes;
-  const char* mnemonicNames[256];
-  vrEmu6502AddrMode addrModes[256];
-};
-
 /* ------------------------------------------------------------------
  * PRIVATE CONSTANTS
  */
@@ -103,7 +46,7 @@ static const uint8_t UNSTABLE_MAGIC_CONST = 0xee; // common values are 0x00, 0xe
  */
 inline static uint8_t pop(VrEmu6502* vr6502)
 {
-  return vr6502->readFn(vr6502->spBase | (++vr6502->sp), false);
+  return vr6502->readFn(vr6502->spBase | (++vr6502->sp)/*, false*/);
 }
 
 /*
@@ -111,7 +54,7 @@ inline static uint8_t pop(VrEmu6502* vr6502)
  */
 inline static uint8_t peek(VrEmu6502* vr6502)
 {
-  return vr6502->readFn(vr6502->spBase | (vr6502->sp + 1), false);
+  return vr6502->readFn(vr6502->spBase | (vr6502->sp + 1)/*, false*/);
 }
 
 /*
@@ -119,8 +62,8 @@ inline static uint8_t peek(VrEmu6502* vr6502)
  */
 inline static uint16_t peek16(VrEmu6502* vr6502)
 {
-  return vr6502->readFn(vr6502->spBase | (vr6502->sp + 1), false) |
-         (vr6502->readFn(vr6502->spBase | (vr6502->sp + 2), false) << 8);
+  return vr6502->readFn(vr6502->spBase | (vr6502->sp + 1)/*, false*/) |
+         (vr6502->readFn(vr6502->spBase | (vr6502->sp + 2)/*, false*/) << 8);
 }
 
 /*
@@ -128,7 +71,7 @@ inline static uint16_t peek16(VrEmu6502* vr6502)
  */
 inline static uint16_t read16(VrEmu6502* vr6502, uint16_t addr)
 {
-  return vr6502->readFn(addr, false) | (vr6502->readFn(addr + 1, false) << 8);
+  return vr6502->readFn(addr/*, false*/) | (vr6502->readFn(addr + 1/*, false*/) << 8);
 }
 
 /*
@@ -138,9 +81,9 @@ inline static uint16_t read16Bug(VrEmu6502* vr6502, uint16_t addr)
 {
   if ((addr & 0xff) == 0xff) /* 6502 bug */
   {
-    return vr6502->readFn(addr, false) | (vr6502->readFn(addr & 0xff00, false) << 8);
+    return vr6502->readFn(addr/*, false*/) | (vr6502->readFn(addr & 0xff00/*, false*/) << 8);
   }
-  return vr6502->readFn(addr, false) | (vr6502->readFn(addr + 1, false) << 8);
+  return vr6502->readFn(addr/*, false*/) | (vr6502->readFn(addr + 1/*, false*/) << 8);
 }
 
 /*
@@ -148,7 +91,7 @@ inline static uint16_t read16Bug(VrEmu6502* vr6502, uint16_t addr)
  */
 inline static uint16_t read16Wrapped(VrEmu6502* vr6502, uint16_t addr)
 {
-  return vr6502->readFn(addr, false) | (vr6502->readFn((addr + 1) & 0xff, false) << 8);
+  return vr6502->readFn(addr/*, false*/) | (vr6502->readFn((addr + 1) & 0xff/*, false*/) << 8);
 }
 
 /*
@@ -362,7 +305,7 @@ VR_EMU_6502_DLLEXPORT int vrEmu6502RunInstrs(VrEmu6502* vr6502, int n, int *cycl
       break;
 
     vr6502->currentOpcodeAddr = vr6502->pc++;
-    vr6502->currentOpcode = vr6502->readFn(vr6502->currentOpcodeAddr, false);
+    vr6502->currentOpcode = vr6502->readFn(vr6502->currentOpcodeAddr/*, false*/);
 
     /* find the instruction in the table */
     const vrEmu6502Opcode* opcode = &vr6502->opcodes[vr6502->currentOpcode];
@@ -415,7 +358,7 @@ VR_EMU_6502_DLLEXPORT int vrEmu6502RunCycles(VrEmu6502* vr6502, int n, int *cycl
       break;
 
     vr6502->currentOpcodeAddr = vr6502->pc++;
-    vr6502->currentOpcode = vr6502->readFn(vr6502->currentOpcodeAddr, false);
+    vr6502->currentOpcode = vr6502->readFn(vr6502->currentOpcodeAddr/*, false*/);
 
     /* find the instruction in the table */
     const vrEmu6502Opcode* opcode = &vr6502->opcodes[vr6502->currentOpcode];
@@ -478,7 +421,7 @@ VR_EMU_6502_DLLEXPORT void vrEmu6502Tick(VrEmu6502* vr6502)
     if (!vr6502->wai)
     {
       vr6502->currentOpcodeAddr = vr6502->pc++;
-      vr6502->currentOpcode = vr6502->readFn(vr6502->currentOpcodeAddr, false);
+      vr6502->currentOpcode = vr6502->readFn(vr6502->currentOpcodeAddr/*, false*/);
 
       /* find the instruction in the table */
       const vrEmu6502Opcode* opcode = &vr6502->opcodes[vr6502->currentOpcode];
@@ -658,7 +601,7 @@ VR_EMU_6502_DLLEXPORT uint16_t vrEmu6502GetCurrentOpcodeAddr(VrEmu6502* vr6502)
  */
 VR_EMU_6502_DLLEXPORT uint8_t vrEmu6502GetNextOpcode(VrEmu6502* vr6502)
 {
-  return vr6502->readFn(vr6502->pc, true);
+  return vr6502->readFn(vr6502->pc/*, true*/);
 }
 
 
@@ -705,9 +648,9 @@ uint16_t vrEmu6502DisassembleInstruction(
 {
   if (vr6502)
   {
-    uint8_t opcode = vr6502->readFn(addr, true);
-    uint8_t arg8 = vr6502->readFn(addr + 1, true);
-    uint16_t arg16 = (vr6502->readFn(addr + 2, true) << 8) | arg8;
+    uint8_t opcode = vr6502->readFn(addr/*, true*/);
+    uint8_t arg8 = vr6502->readFn(addr + 1/*, true*/);
+    uint16_t arg16 = (vr6502->readFn(addr + 2/*, true*/) << 8) | arg8;
     const char *mnemonic = vrEmu6502OpcodeToMnemonicStr(vr6502, opcode);
 
     const char* addr8Label = labelMap ? labelMap[arg8] : NULL;
@@ -845,7 +788,7 @@ uint16_t vrEmu6502DisassembleInstruction(
 /*
  * absolute mode - eg. lda $1234
  */
-static uint16_t ab(VrEmu6502* vr6502)
+/*static*/ uint16_t ab(VrEmu6502* vr6502)
 {
   uint16_t addr = read16(vr6502, vr6502->pc++);
   ++vr6502->pc;
@@ -855,7 +798,7 @@ static uint16_t ab(VrEmu6502* vr6502)
 /*
  * absolute indexed x - eg. lda $1234, x
  */
-static uint16_t abx(VrEmu6502* vr6502)
+/*static*/ uint16_t abx(VrEmu6502* vr6502)
 {
   uint16_t base = read16(vr6502, vr6502->pc++); ++vr6502->pc;
   return base + vr6502->ix;
@@ -864,7 +807,7 @@ static uint16_t abx(VrEmu6502* vr6502)
 /*
  * absolute indexed y - eg. lda $1234, y
  */
-static uint16_t aby(VrEmu6502* vr6502)
+/*static*/ uint16_t aby(VrEmu6502* vr6502)
 {
   uint16_t base = read16(vr6502, vr6502->pc++); ++vr6502->pc;
   return base + vr6502->iy;
@@ -873,7 +816,7 @@ static uint16_t aby(VrEmu6502* vr6502)
 /*
  * absolute indexed x (with page boundary cycle check) - eg. lda $1234, x
  */
-static uint16_t axp(VrEmu6502* vr6502)
+/*static*/ uint16_t axp(VrEmu6502* vr6502)
 {
   uint16_t base = read16(vr6502, vr6502->pc++); ++vr6502->pc;
   uint16_t addr = base + vr6502->ix;
@@ -884,7 +827,7 @@ static uint16_t axp(VrEmu6502* vr6502)
 /*
  * absolute indexed y (with page boundary cycle check) - eg. lda $1234, y
  */
-static uint16_t ayp(VrEmu6502* vr6502)
+/*static*/ uint16_t ayp(VrEmu6502* vr6502)
 {
   uint16_t base = read16(vr6502, vr6502->pc++); ++vr6502->pc;
   uint16_t addr = base + vr6502->iy;
@@ -895,7 +838,7 @@ static uint16_t ayp(VrEmu6502* vr6502)
 /*
  * immediate mdoe - eg. lda #12
  */
-static uint16_t imm(VrEmu6502* vr6502)
+/*static*/ uint16_t imm(VrEmu6502* vr6502)
 {
   return vr6502->pc++;
 }
@@ -903,7 +846,7 @@ static uint16_t imm(VrEmu6502* vr6502)
 /*
  * indirect mode (jmp only) - eg. jmp ($1234)
  */
-static uint16_t ind(VrEmu6502* vr6502)
+/*static*/ uint16_t ind(VrEmu6502* vr6502)
 {
   if (vr6502->model == CPU_6502)
   {
@@ -920,7 +863,7 @@ static uint16_t ind(VrEmu6502* vr6502)
 /*
  * indirect x mode (jmp only) - eg. jmp ($1234, x)
  */
-static uint16_t indx(VrEmu6502* vr6502)
+/*static*/ uint16_t indx(VrEmu6502* vr6502)
 {
   uint16_t addr = read16(vr6502, vr6502->pc++) + vr6502->ix;
   return read16(vr6502, addr);
@@ -929,26 +872,26 @@ static uint16_t indx(VrEmu6502* vr6502)
 /*
  * relative mode (branch instructions) - eg. bne -5
  */
-static uint16_t rel(VrEmu6502* vr6502)
+/*static*/ uint16_t rel(VrEmu6502* vr6502)
 {
-  int8_t offset = (int8_t)vr6502->readFn(vr6502->pc, false);
+  int8_t offset = (int8_t)vr6502->readFn(vr6502->pc/*, false*/);
   return vr6502->pc++ + offset + 1;
 }
 
 /*
  * indexed indirect mode - eg. lda ($12, x)
  */
-static uint16_t xin(VrEmu6502* vr6502)
+/*static*/ uint16_t xin(VrEmu6502* vr6502)
 {
-  return read16Wrapped(vr6502, (vr6502->zpBase + vr6502->readFn(vr6502->pc++, false) + vr6502->ix) & 0xff);
+  return read16Wrapped(vr6502, (vr6502->zpBase + vr6502->readFn(vr6502->pc++/*, false*/) + vr6502->ix) & 0xff);
 }
 
 /*
  * indirect indexed mode - eg. lda ($12), y
  */
-static uint16_t yin(VrEmu6502* vr6502)
+/*static*/ uint16_t yin(VrEmu6502* vr6502)
 {
-  uint16_t base = read16Wrapped(vr6502, vr6502->zpBase + vr6502->readFn(vr6502->pc++, false));
+  uint16_t base = read16Wrapped(vr6502, vr6502->zpBase + vr6502->readFn(vr6502->pc++/*, false*/));
   uint16_t addr = base + vr6502->iy;
   return addr;
 }
@@ -956,9 +899,9 @@ static uint16_t yin(VrEmu6502* vr6502)
 /*
  * indirect indexed mode (with page boundary cycle check) - eg. lda ($12), y
  */
-static uint16_t yip(VrEmu6502* vr6502)
+/*static*/ uint16_t yip(VrEmu6502* vr6502)
 {
-  uint16_t base = read16Wrapped(vr6502, vr6502->zpBase + vr6502->readFn(vr6502->pc++, false));
+  uint16_t base = read16Wrapped(vr6502, vr6502->zpBase + vr6502->readFn(vr6502->pc++/*, false*/));
   uint16_t addr = base + vr6502->iy;
   pageBoundary(vr6502, base, addr);
   return addr;
@@ -967,33 +910,33 @@ static uint16_t yip(VrEmu6502* vr6502)
 /*
  * zero page - eg. lda $12
  */
-static uint16_t zp(VrEmu6502* vr6502)
+/*static*/ uint16_t zp(VrEmu6502* vr6502)
 {
-  return vr6502->zpBase + vr6502->readFn(vr6502->pc++, false);
+  return vr6502->zpBase + vr6502->readFn(vr6502->pc++/*, false*/);
 }
 
 /*
  * indirect mode - eg. lda ($12)
  */
-static uint16_t zpi(VrEmu6502* vr6502)
+/*static*/ uint16_t zpi(VrEmu6502* vr6502)
 {
-  return read16Wrapped(vr6502, vr6502->zpBase + vr6502->readFn(vr6502->pc++, false));
+  return read16Wrapped(vr6502, vr6502->zpBase + vr6502->readFn(vr6502->pc++/*, false*/));
 }
 
 /*
  * zero page indexed x - eg. lda $12, x
  */
-static uint16_t zpx(VrEmu6502* vr6502)
+/*static*/ uint16_t zpx(VrEmu6502* vr6502)
 {
-  return vr6502->zpBase + ((vr6502->readFn(vr6502->pc++, false) + vr6502->ix) & 0xff);
+  return vr6502->zpBase + ((vr6502->readFn(vr6502->pc++/*, false*/) + vr6502->ix) & 0xff);
 }
 
 /*
  * zero page indexed y - eg. lda $12, y
  */
-static uint16_t zpy(VrEmu6502* vr6502)
+/*static*/ uint16_t zpy(VrEmu6502* vr6502)
 {
-  return vr6502->zpBase + ((vr6502->readFn(vr6502->pc++, false) + vr6502->iy) & 0xff);
+  return vr6502->zpBase + ((vr6502->readFn(vr6502->pc++/*, false*/) + vr6502->iy) & 0xff);
 }
 
 /*
@@ -1024,7 +967,7 @@ static uint16_t tmp(VrEmu6502* vr6502)
  */
 static void adcd(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
-  uint8_t value = vr6502->readFn(modeAddr(vr6502), false);
+  uint8_t value = vr6502->readFn(modeAddr(vr6502)/*, false*/);
 
   uint8_t vu = value & 0x0f;
   uint8_t vt = (value & 0xf0) >> 4;
@@ -1076,7 +1019,7 @@ static void adcd(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * add with carry
  */
-static void adc(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void adc(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   if (testBit(vr6502, BitD))
   {
@@ -1084,7 +1027,7 @@ static void adc(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
   }
   else
   {
-    uint8_t opr = vr6502->readFn(modeAddr(vr6502), false);
+    uint8_t opr = vr6502->readFn(modeAddr(vr6502)/*, false*/);
     uint16_t result = vr6502->ac + opr + testBit(vr6502, BitC);
 
     setOrClearBit(vr6502, BitC, result > 0xff);
@@ -1097,15 +1040,15 @@ static void adc(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * bitwise and
  */
-static void and(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void and(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
-  setNZ(vr6502, vr6502->ac &= vr6502->readFn(modeAddr(vr6502), false));
+  setNZ(vr6502, vr6502->ac &= vr6502->readFn(modeAddr(vr6502)/*, false*/));
 }
 
 /*
  * aritmetic shift left
  */
-static void asl(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void asl(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   if (modeAddr == acc)
   {
@@ -1115,7 +1058,7 @@ static void asl(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
   }
 
   uint16_t addr = modeAddr(vr6502);
-  uint8_t result = vr6502->readFn(addr, false);
+  uint8_t result = vr6502->readFn(addr/*, false*/);
   setOrClearBit(vr6502, BitC, result & 0x80);
   setNZ(vr6502, result <<= 1);
   vr6502->writeFn(addr, result);
@@ -1124,7 +1067,7 @@ static void asl(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * branch (always)
  */
-static void bra(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void bra(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   ++vr6502->step; /* extra because we branched */
 
@@ -1136,7 +1079,7 @@ static void bra(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * branch if carry clear
  */
-static void bcc(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void bcc(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   if (!testBit(vr6502, BitC)) bra(vr6502, modeAddr); else modeAddr(vr6502);
 }
@@ -1144,7 +1087,7 @@ static void bcc(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * branch if carry set
  */
-static void bcs(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void bcs(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   if (testBit(vr6502, BitC)) bra(vr6502, modeAddr); else modeAddr(vr6502);
 }
@@ -1152,7 +1095,7 @@ static void bcs(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * branch if equal (if zero set)
  */
-static void beq(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void beq(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   if (testBit(vr6502, BitZ)) bra(vr6502, modeAddr); else modeAddr(vr6502);
 }
@@ -1160,9 +1103,9 @@ static void beq(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * bit test 
  */
-static void bit(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void bit(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
-  uint8_t val = vr6502->readFn(modeAddr(vr6502), false);
+  uint8_t val = vr6502->readFn(modeAddr(vr6502)/*, false*/);
 
   if (modeAddr != imm)
   {
@@ -1178,7 +1121,7 @@ static void bit(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * branch if minus (if N bit set)
  */
-static void bmi(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void bmi(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   if (testBit(vr6502, BitN)) bra(vr6502, modeAddr); else modeAddr(vr6502);
 }
@@ -1186,7 +1129,7 @@ static void bmi(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * branch if not equal (if Z bit not set)
  */
-static void bne(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void bne(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   if (!testBit(vr6502, BitZ)) bra(vr6502, modeAddr); else modeAddr(vr6502);
 }
@@ -1194,7 +1137,7 @@ static void bne(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * branch if plus (if N bit not set)
  */
-static void bpl(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void bpl(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   if (!testBit(vr6502, BitN)) bra(vr6502, modeAddr); else modeAddr(vr6502);
 }
@@ -1202,7 +1145,7 @@ static void bpl(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * trigger a software interrupt
  */
-static void brk(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void _brk(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   push(vr6502, (++vr6502->pc) >> 8);
   push(vr6502, (vr6502->pc) & 0xff);
@@ -1220,7 +1163,7 @@ static void brk(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * branch if overflow clear
  */
-static void bvc(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void bvc(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   if (!testBit(vr6502, BitV)) bra(vr6502, modeAddr); else modeAddr(vr6502);
 }
@@ -1228,7 +1171,7 @@ static void bvc(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * branch if overflow set
  */
-static void bvs(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void bvs(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   if (testBit(vr6502, BitV)) bra(vr6502, modeAddr); else modeAddr(vr6502);
 }
@@ -1236,7 +1179,7 @@ static void bvs(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * clear carry flag
  */
-static void clc(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void clc(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   clearBit(vr6502, BitC);
 }
@@ -1244,7 +1187,7 @@ static void clc(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * clear decimal flag
  */
-static void cld(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void cld(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   clearBit(vr6502, BitD);
 }
@@ -1252,7 +1195,7 @@ static void cld(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * clear interrupt flag
  */
-static void cli(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void cli(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   clearBit(vr6502, BitI);
 }
@@ -1260,7 +1203,7 @@ static void cli(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * clear overflow flag
  */
-static void clv(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void clv(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   clearBit(vr6502, BitV);
 }
@@ -1268,9 +1211,9 @@ static void clv(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * compare value with accumulator
  */
-static void cmp(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void cmp(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
-  uint8_t opr = ~vr6502->readFn(modeAddr(vr6502), false);
+  uint8_t opr = ~vr6502->readFn(modeAddr(vr6502)/*, false*/);
   uint16_t result = vr6502->ac + opr + 1;
 
   setOrClearBit(vr6502, BitC, result > 0xff);
@@ -1280,9 +1223,9 @@ static void cmp(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * compare value with x register
  */
-static void cpx(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void cpx(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
-  uint8_t opr = ~vr6502->readFn(modeAddr(vr6502), false);
+  uint8_t opr = ~vr6502->readFn(modeAddr(vr6502)/*, false*/);
   uint16_t result = vr6502->ix + opr + 1;
 
   setOrClearBit(vr6502, BitC, result > 0xff);
@@ -1292,9 +1235,9 @@ static void cpx(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * compare value with y register
  */
-static void cpy(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void cpy(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
-  uint8_t opr = ~vr6502->readFn(modeAddr(vr6502), false);
+  uint8_t opr = ~vr6502->readFn(modeAddr(vr6502)/*, false*/);
   uint16_t result = vr6502->iy + opr + 1;
 
   setOrClearBit(vr6502, BitC, result > 0xff);
@@ -1304,7 +1247,7 @@ static void cpy(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * decrement value
  */
-static void dec(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void dec(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   if (modeAddr == acc)
   {
@@ -1313,7 +1256,7 @@ static void dec(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
   }
 
   uint16_t addr = modeAddr(vr6502);
-  uint8_t val = vr6502->readFn(addr, false) - 1;
+  uint8_t val = vr6502->readFn(addr/*, false*/) - 1;
   setNZ(vr6502, val);
   vr6502->writeFn(addr, val);
 }
@@ -1321,7 +1264,7 @@ static void dec(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * decrement x register
  */
-static void dex(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void dex(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   setNZ(vr6502, --vr6502->ix);
 }
@@ -1329,7 +1272,7 @@ static void dex(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * decrement y register
  */
-static void dey(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void dey(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   setNZ(vr6502, --vr6502->iy);
 }
@@ -1337,15 +1280,15 @@ static void dey(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * exclusive or with accumulator
  */
-static void eor(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void eor(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
-  setNZ(vr6502, vr6502->ac ^= vr6502->readFn(modeAddr(vr6502), false));
+  setNZ(vr6502, vr6502->ac ^= vr6502->readFn(modeAddr(vr6502)/*, false*/));
 }
 
 /*
  * increment value
  */
-static void inc(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void inc(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   if (modeAddr == acc)
   {
@@ -1354,7 +1297,7 @@ static void inc(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
   }
 
   uint16_t addr = modeAddr(vr6502);
-  uint8_t val = vr6502->readFn(addr, false) + 1;
+  uint8_t val = vr6502->readFn(addr/*, false*/) + 1;
   setNZ(vr6502, val);
   vr6502->writeFn(addr, val);
 }
@@ -1362,7 +1305,7 @@ static void inc(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * increment x register
  */
-static void inx(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void inx(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   setNZ(vr6502, ++vr6502->ix);
 }
@@ -1370,7 +1313,7 @@ static void inx(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * increment y register
  */
-static void iny(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void iny(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   setNZ(vr6502, ++vr6502->iy);
 }
@@ -1378,7 +1321,7 @@ static void iny(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * jump to address
  */
-static void jmp(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void jmp(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   vr6502->pc = modeAddr(vr6502);
 }
@@ -1386,7 +1329,7 @@ static void jmp(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * jump to subroutine
  */
-static void jsr(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void jsr(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   uint16_t addr = modeAddr(vr6502);
   push(vr6502, --vr6502->pc >> 8);
@@ -1397,31 +1340,31 @@ static void jsr(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * load a value to the accumulator
  */
-static void lda(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void lda(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
-  setNZ(vr6502, vr6502->ac = vr6502->readFn(modeAddr(vr6502), false));
+  setNZ(vr6502, vr6502->ac = vr6502->readFn(modeAddr(vr6502)/*, false*/));
 }
 
 /*
  * load a value to the x register
  */
-static void ldx(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void ldx(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
-  setNZ(vr6502, vr6502->ix = vr6502->readFn(modeAddr(vr6502), false));
+  setNZ(vr6502, vr6502->ix = vr6502->readFn(modeAddr(vr6502)/*, false*/));
 }
 
 /*
  * load a value to the y register
  */
-static void ldy(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void ldy(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
-  setNZ(vr6502, vr6502->iy = vr6502->readFn(modeAddr(vr6502), false));
+  setNZ(vr6502, vr6502->iy = vr6502->readFn(modeAddr(vr6502)/*, false*/));
 }
 
 /*
  * logical shift left
  */
-static void lsr(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void lsr(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   if (modeAddr == acc)
   {
@@ -1431,7 +1374,7 @@ static void lsr(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
   }
 
   uint16_t addr = modeAddr(vr6502);
-  uint8_t result = vr6502->readFn(addr, false);
+  uint8_t result = vr6502->readFn(addr/*, false*/);
   setOrClearBit(vr6502, BitC, result & 0x01);
   setNZ(vr6502, result >>= 1);
   vr6502->writeFn(addr, result);
@@ -1440,7 +1383,7 @@ static void lsr(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * no operation
  */
-static void nop(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void nop(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   if (modeAddr) modeAddr(vr6502);
 }
@@ -1448,27 +1391,27 @@ static void nop(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * load and discard (other 65c02 nops)
  */
-static void ldd(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void ldd(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   if (modeAddr)
   {
     /* we still want to read the data (and discard it) */
-    vr6502->readFn(modeAddr(vr6502), false);
+    vr6502->readFn(modeAddr(vr6502)/*, false*/);
   }
 }
 
 /*
  * bitwise or with acculmulator
  */
-static void ora(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void ora(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
-  setNZ(vr6502, vr6502->ac |= vr6502->readFn(modeAddr(vr6502), false));
+  setNZ(vr6502, vr6502->ac |= vr6502->readFn(modeAddr(vr6502)/*, false*/));
 }
 
 /*
  * push accumulator to stack
  */
-static void pha(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void pha(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   push(vr6502, vr6502->ac);
 }
@@ -1476,7 +1419,7 @@ static void pha(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * push status register to stack
  */
-static void php(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void php(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   push(vr6502, vr6502->flags | 0x30);
 }
@@ -1484,7 +1427,7 @@ static void php(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * push x register to stack
  */
-static void phx(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void phx(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   push(vr6502, vr6502->ix);
 }
@@ -1492,7 +1435,7 @@ static void phx(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * push y register to stack
  */
-static void phy(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void phy(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   push(vr6502, vr6502->iy);
 }
@@ -1500,7 +1443,7 @@ static void phy(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * pop from stack to accumulator
  */
-static void pla(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void pla(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   setNZ(vr6502, vr6502->ac = pop(vr6502));
 }
@@ -1508,7 +1451,7 @@ static void pla(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * pop from stack to status register
  */
-static void plp(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void plp(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   vr6502->flags = pop(vr6502);
 }
@@ -1516,7 +1459,7 @@ static void plp(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * pop from stack to x register
  */
-static void plx(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void plx(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   setNZ(vr6502, vr6502->ix = pop(vr6502));
 }
@@ -1524,7 +1467,7 @@ static void plx(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * pop from stack to y register
  */
-static void ply(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void ply(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   setNZ(vr6502, vr6502->iy = pop(vr6502));
 }
@@ -1532,7 +1475,7 @@ static void ply(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * rotate value left
  */
-static void rol(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void rol(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   if (modeAddr == acc)
   {
@@ -1544,7 +1487,7 @@ static void rol(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
   }
 
   uint16_t addr = modeAddr(vr6502);
-  uint8_t val = vr6502->readFn(addr, false);
+  uint8_t val = vr6502->readFn(addr/*, false*/);
   bool tc = val & 0x80;
   val = (val << 1) | testBit(vr6502, BitC);
   setOrClearBit(vr6502, BitC, tc);
@@ -1555,7 +1498,7 @@ static void rol(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * rotate value right
  */
-static void ror(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void ror(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   if (modeAddr == acc)
   {
@@ -1567,7 +1510,7 @@ static void ror(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
   }
 
   uint16_t addr = modeAddr(vr6502);
-  uint8_t val = vr6502->readFn(addr, false);
+  uint8_t val = vr6502->readFn(addr/*, false*/);
   bool tc = val & 0x01;
   val = (val >> 1) | (testBit(vr6502, BitC) * 0x80);
   setOrClearBit(vr6502, BitC, tc);
@@ -1578,7 +1521,7 @@ static void ror(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * return from interrupt
  */
-static void rti(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void rti(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   vr6502->inNmi = 0;
   vr6502->flags = pop(vr6502);
@@ -1589,7 +1532,7 @@ static void rti(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * return from subroutine
  */
-static void rts(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void rts(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   vr6502->pc = pop(vr6502);
   vr6502->pc |= pop(vr6502) << 8;
@@ -1601,7 +1544,7 @@ static void rts(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
  */
 static void sbcd(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
-  uint8_t value = vr6502->readFn(modeAddr(vr6502), false);
+  uint8_t value = vr6502->readFn(modeAddr(vr6502)/*, false*/);
   uint16_t binResult = vr6502->ac + ~value + testBit(vr6502, BitC);
 
   uint16_t result = 0;
@@ -1654,7 +1597,7 @@ static void sbcd(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * subtract with carry
  */
-static void sbc(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void sbc(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   if (testBit(vr6502, BitD))
   {
@@ -1662,7 +1605,7 @@ static void sbc(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
     return;
   }
 
-  uint8_t opr = ~vr6502->readFn(modeAddr(vr6502), false);
+  uint8_t opr = ~vr6502->readFn(modeAddr(vr6502)/*, false*/);
   uint16_t result = vr6502->ac + opr + testBit(vr6502, BitC);
 
   setOrClearBit(vr6502, BitC, result > 0xff);
@@ -1675,7 +1618,7 @@ static void sbc(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * set carry flag
  */
-static void sec(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void sec(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   setBit(vr6502, BitC);
 }
@@ -1683,7 +1626,7 @@ static void sec(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * set decimal flag
  */
-static void sed(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void sed(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   setBit(vr6502, BitD);
 }
@@ -1691,7 +1634,7 @@ static void sed(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * set interrupt disable flag
  */
-static void sei(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void sei(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   setBit(vr6502, BitI);
 }
@@ -1699,7 +1642,7 @@ static void sei(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * store accumulator to address
  */
-static void sta(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void sta(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   vr6502->writeFn(modeAddr(vr6502), vr6502->ac);
 }
@@ -1707,7 +1650,7 @@ static void sta(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * store x register to address
  */
-static void stx(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void stx(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   vr6502->writeFn(modeAddr(vr6502), vr6502->ix);
 }
@@ -1715,7 +1658,7 @@ static void stx(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * store y register to address
  */
-static void sty(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void sty(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   vr6502->writeFn(modeAddr(vr6502), vr6502->iy);
 }
@@ -1723,7 +1666,7 @@ static void sty(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * store 0 to address
  */
-static void stz(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void stz(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   vr6502->writeFn(modeAddr(vr6502), 0);
 }
@@ -1731,7 +1674,7 @@ static void stz(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * transfer accumulator to x register
  */
-static void tax(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void tax(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   setNZ(vr6502, vr6502->ix = vr6502->ac);
 }
@@ -1739,7 +1682,7 @@ static void tax(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * transfer accumulator to y register
  */
-static void tay(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void tay(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   setNZ(vr6502, vr6502->iy = vr6502->ac);
 }
@@ -1747,7 +1690,7 @@ static void tay(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * transfer flags register to x register
  */
-static void tsx(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void tsx(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   setNZ(vr6502, vr6502->ix = vr6502->sp);
 }
@@ -1755,7 +1698,7 @@ static void tsx(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * transfer x register to accumulator
  */
-static void txa(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void txa(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   setNZ(vr6502, vr6502->ac = vr6502->ix);
 }
@@ -1763,7 +1706,7 @@ static void txa(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * transfer  x register to flags register
  */
-static void txs(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void txs(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   vr6502->sp = vr6502->ix;
 }
@@ -1771,7 +1714,7 @@ static void txs(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * transfer y register to accumulator
  */
-static void tya(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void tya(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   setNZ(vr6502, vr6502->ac = vr6502->iy);
 }
@@ -1779,10 +1722,10 @@ static void tya(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * test and reset (clear) bit
  */
-static void trb(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void trb(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   uint16_t addr = modeAddr(vr6502);
-  uint8_t temp = vr6502->readFn(addr, false);
+  uint8_t temp = vr6502->readFn(addr/*, false*/);
   vr6502->writeFn(addr, temp & ~vr6502->ac);
   setOrClearBit(vr6502, BitZ, !(temp & vr6502->ac));
 }
@@ -1790,10 +1733,10 @@ static void trb(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * test and set bit
  */
-static void tsb(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void tsb(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   uint16_t addr = modeAddr(vr6502);
-  uint8_t temp = vr6502->readFn(addr, false);
+  uint8_t temp = vr6502->readFn(addr/*, false*/);
   vr6502->writeFn(addr, temp | vr6502->ac);
   setOrClearBit(vr6502, BitZ, !(temp & vr6502->ac));
 }
@@ -1801,46 +1744,46 @@ static void tsb(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * reset a bit (zero page only)
  */
-static void rmb(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr, int bitIndex)
+/*static*/ void rmb(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr, int bitIndex)
 {
   uint16_t addr = modeAddr(vr6502);
-  vr6502->writeFn(addr, vr6502->readFn(addr, false) & ~(0x01 << bitIndex));
+  vr6502->writeFn(addr, vr6502->readFn(addr/*, false*/) & ~(0x01 << bitIndex));
 }
 
-static void rmb0(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { rmb(vr6502, modeAddr, 0); }
-static void rmb1(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { rmb(vr6502, modeAddr, 1); }
-static void rmb2(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { rmb(vr6502, modeAddr, 2); }
-static void rmb3(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { rmb(vr6502, modeAddr, 3); }
-static void rmb4(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { rmb(vr6502, modeAddr, 4); }
-static void rmb5(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { rmb(vr6502, modeAddr, 5); }
-static void rmb6(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { rmb(vr6502, modeAddr, 6); }
-static void rmb7(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { rmb(vr6502, modeAddr, 7); }
+/*static*/ void rmb0(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { rmb(vr6502, modeAddr, 0); }
+/*static*/ void rmb1(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { rmb(vr6502, modeAddr, 1); }
+/*static*/ void rmb2(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { rmb(vr6502, modeAddr, 2); }
+/*static*/ void rmb3(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { rmb(vr6502, modeAddr, 3); }
+/*static*/ void rmb4(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { rmb(vr6502, modeAddr, 4); }
+/*static*/ void rmb5(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { rmb(vr6502, modeAddr, 5); }
+/*static*/ void rmb6(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { rmb(vr6502, modeAddr, 6); }
+/*static*/ void rmb7(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { rmb(vr6502, modeAddr, 7); }
 
 
 /*
  * set a bit (zero page only)
  */
-static void smb(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr, int bitIndex)
+/*static*/ void smb(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr, int bitIndex)
 {
   uint16_t addr = modeAddr(vr6502);
-  vr6502->writeFn(addr, vr6502->readFn(addr, false) | (0x01 << bitIndex));
+  vr6502->writeFn(addr, vr6502->readFn(addr/*, false*/) | (0x01 << bitIndex));
 }
 
-static void smb0(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { smb(vr6502, modeAddr, 0); }
-static void smb1(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { smb(vr6502, modeAddr, 1); }
-static void smb2(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { smb(vr6502, modeAddr, 2); }
-static void smb3(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { smb(vr6502, modeAddr, 3); }
-static void smb4(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { smb(vr6502, modeAddr, 4); }
-static void smb5(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { smb(vr6502, modeAddr, 5); }
-static void smb6(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { smb(vr6502, modeAddr, 6); }
-static void smb7(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { smb(vr6502, modeAddr, 7); }
+/*static*/ void smb0(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { smb(vr6502, modeAddr, 0); }
+/*static*/ void smb1(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { smb(vr6502, modeAddr, 1); }
+/*static*/ void smb2(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { smb(vr6502, modeAddr, 2); }
+/*static*/ void smb3(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { smb(vr6502, modeAddr, 3); }
+/*static*/ void smb4(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { smb(vr6502, modeAddr, 4); }
+/*static*/ void smb5(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { smb(vr6502, modeAddr, 5); }
+/*static*/ void smb6(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { smb(vr6502, modeAddr, 6); }
+/*static*/ void smb7(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { smb(vr6502, modeAddr, 7); }
 
 /*
  * branch if bit reset (clear)
  */
-static void bbr(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr, int bitIndex)
+/*static*/ void bbr(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr, int bitIndex)
 {
-  uint8_t val = vr6502->readFn(modeAddr(vr6502), false);
+  uint8_t val = vr6502->readFn(modeAddr(vr6502)/*, false*/);
   if (!(val & (0x01 << bitIndex)))
   {
     vr6502->pc = rel(vr6502);
@@ -1851,21 +1794,21 @@ static void bbr(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr, int bitIndex)
   }
 }
 
-static void bbr0(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { bbr(vr6502, modeAddr, 0); }
-static void bbr1(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { bbr(vr6502, modeAddr, 1); }
-static void bbr2(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { bbr(vr6502, modeAddr, 2); }
-static void bbr3(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { bbr(vr6502, modeAddr, 3); }
-static void bbr4(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { bbr(vr6502, modeAddr, 4); }
-static void bbr5(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { bbr(vr6502, modeAddr, 5); }
-static void bbr6(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { bbr(vr6502, modeAddr, 6); }
-static void bbr7(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { bbr(vr6502, modeAddr, 7); }
+/*static*/ void bbr0(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { bbr(vr6502, modeAddr, 0); }
+/*static*/ void bbr1(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { bbr(vr6502, modeAddr, 1); }
+/*static*/ void bbr2(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { bbr(vr6502, modeAddr, 2); }
+/*static*/ void bbr3(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { bbr(vr6502, modeAddr, 3); }
+/*static*/ void bbr4(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { bbr(vr6502, modeAddr, 4); }
+/*static*/ void bbr5(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { bbr(vr6502, modeAddr, 5); }
+/*static*/ void bbr6(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { bbr(vr6502, modeAddr, 6); }
+/*static*/ void bbr7(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { bbr(vr6502, modeAddr, 7); }
 
 /*
  * branch if bit set (clear)
  */
-static void bbs(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr, int bitIndex)
+/*static*/ void bbs(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr, int bitIndex)
 {
-  uint8_t val = vr6502->readFn(modeAddr(vr6502), false);
+  uint8_t val = vr6502->readFn(modeAddr(vr6502)/*, false*/);
   if ((val & (0x01 << bitIndex)))
   {
     vr6502->pc = rel(vr6502);
@@ -1876,19 +1819,19 @@ static void bbs(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr, int bitIndex)
   }
 }
 
-static void bbs0(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { bbs(vr6502, modeAddr, 0); }
-static void bbs1(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { bbs(vr6502, modeAddr, 1); }
-static void bbs2(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { bbs(vr6502, modeAddr, 2); }
-static void bbs3(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { bbs(vr6502, modeAddr, 3); }
-static void bbs4(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { bbs(vr6502, modeAddr, 4); }
-static void bbs5(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { bbs(vr6502, modeAddr, 5); }
-static void bbs6(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { bbs(vr6502, modeAddr, 6); }
-static void bbs7(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { bbs(vr6502, modeAddr, 7); }
+/*static*/ void bbs0(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { bbs(vr6502, modeAddr, 0); }
+/*static*/ void bbs1(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { bbs(vr6502, modeAddr, 1); }
+/*static*/ void bbs2(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { bbs(vr6502, modeAddr, 2); }
+/*static*/ void bbs3(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { bbs(vr6502, modeAddr, 3); }
+/*static*/ void bbs4(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { bbs(vr6502, modeAddr, 4); }
+/*static*/ void bbs5(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { bbs(vr6502, modeAddr, 5); }
+/*static*/ void bbs6(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { bbs(vr6502, modeAddr, 6); }
+/*static*/ void bbs7(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr) { bbs(vr6502, modeAddr, 7); }
 
 /*
  * stop the processor 
  */
-static void stp(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void stp(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   if (modeAddr)
     --vr6502->pc;
@@ -1897,7 +1840,7 @@ static void stp(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 /*
  * wait for interrupt
  */
-static void wai(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
+/*static*/ void wai(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   vr6502->wai = 1;
 }
@@ -1967,7 +1910,7 @@ static void sax(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
  */
 static void lax(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
-  setNZ(vr6502, vr6502->ac = vr6502->ix = vr6502->readFn(modeAddr(vr6502), false));
+  setNZ(vr6502, vr6502->ac = vr6502->ix = vr6502->readFn(modeAddr(vr6502)/*, false*/));
 }
 
 /*
@@ -2023,7 +1966,7 @@ static void arr(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
  */
 static void sbx(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
-  uint8_t opr = ~vr6502->readFn(modeAddr(vr6502), false);
+  uint8_t opr = ~vr6502->readFn(modeAddr(vr6502)/*, false*/);
   uint16_t result = (vr6502->ac & vr6502->ix) + opr + 1;
 
   setOrClearBit(vr6502, BitC, result > 0xff);
@@ -2035,7 +1978,7 @@ static void sbx(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
  */
 static void las(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
-  vr6502->sp &= vr6502->readFn(modeAddr(vr6502), false);
+  vr6502->sp &= vr6502->readFn(modeAddr(vr6502)/*, false*/);
   setNZ(vr6502, vr6502->ac = vr6502->ix = vr6502->sp);
 }
 
@@ -2083,7 +2026,7 @@ static void tas(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 static void ane(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   vr6502->ac = (vr6502->ac | UNSTABLE_MAGIC_CONST) & vr6502->ix;
-  vr6502->ac &= vr6502->readFn(modeAddr(vr6502), false);
+  vr6502->ac &= vr6502->readFn(modeAddr(vr6502)/*, false*/);
   setNZ(vr6502, vr6502->ac);
 }
 
@@ -2093,7 +2036,7 @@ static void ane(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 static void lxa(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
   vr6502->ac = (vr6502->ac | UNSTABLE_MAGIC_CONST);
-  vr6502->ac &= vr6502->readFn(modeAddr(vr6502), false);
+  vr6502->ac &= vr6502->readFn(modeAddr(vr6502)/*, false*/);
   setNZ(vr6502, vr6502->ac);
 }
 
@@ -2102,7 +2045,7 @@ static void lxa(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
  */
 static void jam(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 {
-  vr6502->readFn(imm(vr6502), false);
+  vr6502->readFn(imm(vr6502)/*, false*/);
   vr6502->jam = 1;
 }
 
@@ -2118,7 +2061,7 @@ static void jam(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr)
 
 static const vrEmu6502Opcode std6502[256] = {
 /*      |      _0      |      _1      |      _2      |      _3      |      _4      |      _5      |      _6      |      _7      |      _8      |      _9      |      _A      |      _B      |      _C      |      _D      |      _E      |      _F      | */
-/* 0_ */ {brk, imp, 7}, {ora, xin, 6},    invalid   ,    invalid   ,    invalid   , {ora,  zp, 3}, {asl,  zp, 5},    invalid   , {php, imp, 3}, {ora, imm, 2}, {asl, acc, 2},    invalid   ,    invalid   , {ora,  ab, 4}, {asl,  ab, 6},    invalid   ,
+/* 0_ */ {_brk, imp, 7}, {ora, xin, 6},    invalid   ,    invalid   ,    invalid   , {ora,  zp, 3}, {asl,  zp, 5},    invalid   , {php, imp, 3}, {ora, imm, 2}, {asl, acc, 2},    invalid   ,    invalid   , {ora,  ab, 4}, {asl,  ab, 6},    invalid   ,
 /* 1_ */ {bpl, rel, 2}, {ora, yip, 5},    invalid   ,    invalid   ,    invalid   , {ora, zpx, 4}, {asl, zpx, 6},    invalid   , {clc, imp, 2}, {ora, ayp, 4},    invalid   ,    invalid   ,    invalid   , {ora, axp, 4}, {asl, abx, 7},    invalid   ,
 /* 2_ */ {jsr,  ab, 6}, {and, xin, 6},    invalid   ,    invalid   , {bit,  zp, 3}, {and,  zp, 3}, {rol,  zp, 5},    invalid   , {plp, imp, 4}, {and, imm, 2}, {rol, acc, 2},    invalid   , {bit,  ab, 4}, {and,  ab, 4}, {rol,  ab, 6},    invalid   ,
 /* 3_ */ {bmi, rel, 2}, {and, yip, 5},    invalid   ,    invalid   ,    invalid   , {and, zpx, 4}, {rol, zpx, 6},    invalid   , {sec, imp, 2}, {and, ayp, 4},    invalid   ,    invalid   ,    invalid   , {and, axp, 4}, {rol, abx, 7},    invalid   ,
@@ -2137,7 +2080,7 @@ static const vrEmu6502Opcode std6502[256] = {
 
 static const vrEmu6502Opcode std6502U[256] = {
 /*      |      _0      |      _1      |      _2      |      _3      |      _4      |      _5      |      _6      |      _7      |      _8      |      _9      |      _A      |      _B      |      _C      |      _D      |      _E      |      _F      | */
-/* 0_ */ {brk, imp, 7}, {ora, xin, 6},      kil     , {slo, xin, 8}, {nop,  zp, 3}, {ora,  zp, 3}, {asl,  zp, 5}, {slo,  zp, 5}, {php, imp, 3}, {ora, imm, 2}, {asl, acc, 2}, {anc, imm, 2}, {nop,  ab, 4}, {ora,  ab, 4}, {asl,  ab, 6}, {slo,  ab, 6},
+/* 0_ */ {_brk, imp, 7}, {ora, xin, 6},      kil     , {slo, xin, 8}, {nop,  zp, 3}, {ora,  zp, 3}, {asl,  zp, 5}, {slo,  zp, 5}, {php, imp, 3}, {ora, imm, 2}, {asl, acc, 2}, {anc, imm, 2}, {nop,  ab, 4}, {ora,  ab, 4}, {asl,  ab, 6}, {slo,  ab, 6},
 /* 1_ */ {bpl, rel, 2}, {ora, yip, 5},      kil     , {slo, yin, 8}, {nop, zpx, 4}, {ora, zpx, 4}, {asl, zpx, 6}, {slo, zpx, 6}, {clc, imp, 2}, {ora, ayp, 4}, {nop, imp, 2}, {slo, aby, 7}, {nop, axp, 4}, {ora, axp, 4}, {asl, abx, 7}, {slo, abx, 7},
 /* 2_ */ {jsr,  ab, 6}, {and, xin, 6},      kil     , {rla, xin, 8}, {bit,  zp, 3}, {and,  zp, 3}, {rol,  zp, 5}, {rla,  zp, 5}, {plp, imp, 4}, {and, imm, 2}, {rol, acc, 2}, {anc, imm, 2}, {bit,  ab, 4}, {and,  ab, 4}, {rol,  ab, 6}, {rla,  ab, 6},
 /* 3_ */ {bmi, rel, 2}, {and, yip, 5},      kil     , {rla, yin, 8}, {nop, zpx, 4}, {and, zpx, 4}, {rol, zpx, 6}, {rla, zpx, 6}, {sec, imp, 2}, {and, ayp, 4}, {nop, imp, 2}, {rla, aby, 7}, {nop, axp, 4}, {and, axp, 4}, {rol, abx, 7}, {rla, abx, 7},
@@ -2156,7 +2099,7 @@ static const vrEmu6502Opcode std6502U[256] = {
 
 static const vrEmu6502Opcode std65c02[256] = {
 /*      |      _0      |      _1      |      _2      |      _3      |      _4      |      _5      |      _6      |      _7      |      _8      |      _9      |      _A      |      _B      |      _C      |      _D      |      _E      |      _F      | */
-/* 0_ */ {brk, imp, 7}, {ora, xin, 6},    ldd_imm   ,    unnop11   , {tsb,  zp, 5}, {ora,  zp, 3}, {asl,  zp, 5},    unnop11   , {php, imp, 3}, {ora, imm, 2}, {asl, acc, 2},    unnop11   , {tsb,  ab, 6}, {ora,  ab, 4}, {asl,  ab, 6},    unnop11   ,
+/* 0_ */ {_brk, imp, 7}, {ora, xin, 6},    ldd_imm   ,    unnop11   , {tsb,  zp, 5}, {ora,  zp, 3}, {asl,  zp, 5},    unnop11   , {php, imp, 3}, {ora, imm, 2}, {asl, acc, 2},    unnop11   , {tsb,  ab, 6}, {ora,  ab, 4}, {asl,  ab, 6},    unnop11   ,
 /* 1_ */ {bpl, rel, 2}, {ora, yip, 5}, {ora, zpi, 5},    unnop11   , {trb,  zp, 5}, {ora, zpx, 4}, {asl, zpx, 6},    unnop11   , {clc, imp, 2}, {ora, ayp, 4}, {inc, acc, 2},    unnop11   , {trb,  ab, 6}, {ora, axp, 4}, {asl, axp, 6},    unnop11   ,
 /* 2_ */ {jsr,  ab, 6}, {and, xin, 6},    ldd_imm   ,    unnop11   , {bit,  zp, 3}, {and,  zp, 3}, {rol,  zp, 5},    unnop11   , {plp, imp, 4}, {and, imm, 2}, {rol, acc, 2},    unnop11   , {bit,  ab, 4}, {and,  ab, 4}, {rol,  ab, 6},    unnop11   ,
 /* 3_ */ {bmi, rel, 2}, {and, yip, 5}, {and, zpi, 5},    unnop11   , {bit, zpx, 4}, {and, zpx, 4}, {rol, zpx, 6},    unnop11   , {sec, imp, 2}, {and, ayp, 4}, {dec, acc, 2},    unnop11   , {bit, abx, 4}, {and, axp, 4}, {rol, axp, 6},    unnop11   ,
@@ -2175,7 +2118,7 @@ static const vrEmu6502Opcode std65c02[256] = {
 
 static const vrEmu6502Opcode wdc65c02[256] = {
 /*      |      _0      |      _1      |      _2      |      _3      |      _4      |      _5      |      _6      |      _7      |      _8      |      _9      |      _A      |      _B      |      _C      |      _D      |      _E      |      _F      | */
-/* 0_ */ {brk, imp, 7}, {ora, xin, 6},    ldd_imm   ,    unnop11   , {tsb,  zp, 5}, {ora,  zp, 3}, {asl,  zp, 5}, {rmb0, zp, 5}, {php, imp, 3}, {ora, imm, 2}, {asl, acc, 2},    unnop11   , {tsb,  ab, 6}, {ora,  ab, 4}, {asl,  ab, 6}, {bbr0, zp, 5},
+/* 0_ */ {_brk, imp, 7}, {ora, xin, 6},    ldd_imm   ,    unnop11   , {tsb,  zp, 5}, {ora,  zp, 3}, {asl,  zp, 5}, {rmb0, zp, 5}, {php, imp, 3}, {ora, imm, 2}, {asl, acc, 2},    unnop11   , {tsb,  ab, 6}, {ora,  ab, 4}, {asl,  ab, 6}, {bbr0, zp, 5},
 /* 1_ */ {bpl, rel, 2}, {ora, yip, 5}, {ora, zpi, 5},    unnop11   , {trb,  zp, 5}, {ora, zpx, 4}, {asl, zpx, 6}, {rmb1, zp, 5}, {clc, imp, 2}, {ora, ayp, 4}, {inc, acc, 2},    unnop11   , {trb,  ab, 6}, {ora, axp, 4}, {asl, axp, 6}, {bbr1, zp, 5},
 /* 2_ */ {jsr,  ab, 6}, {and, xin, 6},    ldd_imm   ,    unnop11   , {bit,  zp, 3}, {and,  zp, 3}, {rol,  zp, 5}, {rmb2, zp, 5}, {plp, imp, 4}, {and, imm, 2}, {rol, acc, 2},    unnop11   , {bit,  ab, 4}, {and,  ab, 4}, {rol,  ab, 6}, {bbr2, zp, 5},
 /* 3_ */ {bmi, rel, 2}, {and, yip, 5}, {and, zpi, 5},    unnop11   , {bit, zpx, 4}, {and, zpx, 4}, {rol, zpx, 6}, {rmb3, zp, 5}, {sec, imp, 2}, {and, ayp, 4}, {dec, acc, 2},    unnop11   , {bit, abx, 4}, {and, axp, 4}, {rol, axp, 6}, {bbr3, zp, 5},
@@ -2194,7 +2137,7 @@ static const vrEmu6502Opcode wdc65c02[256] = {
 
 static const vrEmu6502Opcode r65c02[256] = {
 /*      |      _0      |      _1      |      _2      |      _3      |      _4      |      _5      |      _6      |      _7      |      _8      |      _9      |      _A      |      _B      |      _C      |      _D      |      _E      |      _F      | */
-/* 0_ */ {brk, imp, 7}, {ora, xin, 6},    ldd_imm   ,    unnop11   , {tsb,  zp, 5}, {ora,  zp, 3}, {asl,  zp, 5}, {rmb0, zp, 5}, {php, imp, 3}, {ora, imm, 2}, {asl, acc, 2},    unnop11   , {tsb,  ab, 6}, {ora,  ab, 4}, {asl,  ab, 6}, {bbr0, zp, 5},
+/* 0_ */ {_brk, imp, 7}, {ora, xin, 6},    ldd_imm   ,    unnop11   , {tsb,  zp, 5}, {ora,  zp, 3}, {asl,  zp, 5}, {rmb0, zp, 5}, {php, imp, 3}, {ora, imm, 2}, {asl, acc, 2},    unnop11   , {tsb,  ab, 6}, {ora,  ab, 4}, {asl,  ab, 6}, {bbr0, zp, 5},
 /* 1_ */ {bpl, rel, 2}, {ora, yip, 5}, {ora, zpi, 5},    unnop11   , {trb,  zp, 5}, {ora, zpx, 4}, {asl, zpx, 6}, {rmb1, zp, 5}, {clc, imp, 2}, {ora, ayp, 4}, {inc, acc, 2},    unnop11   , {trb,  ab, 6}, {ora, axp, 4}, {asl, axp, 6}, {bbr1, zp, 5},
 /* 2_ */ {jsr,  ab, 6}, {and, xin, 6},    ldd_imm   ,    unnop11   , {bit,  zp, 3}, {and,  zp, 3}, {rol,  zp, 5}, {rmb2, zp, 5}, {plp, imp, 4}, {and, imm, 2}, {rol, acc, 2},    unnop11   , {bit,  ab, 4}, {and,  ab, 4}, {rol,  ab, 6}, {bbr2, zp, 5},
 /* 3_ */ {bmi, rel, 2}, {and, yip, 5}, {and, zpi, 5},    unnop11   , {bit, zpx, 4}, {and, zpx, 4}, {rol, zpx, 6}, {rmb3, zp, 5}, {sec, imp, 2}, {and, ayp, 4}, {dec, acc, 2},    unnop11   , {bit, abx, 4}, {and, axp, 4}, {rol, axp, 6}, {bbr3, zp, 5},
@@ -2266,7 +2209,7 @@ static const char* opcodeToMnemonicStr(VrEmu6502* vr6502, uint8_t opcode)
   mnemonicToStr(bmi);
   mnemonicToStr(bne);
   mnemonicToStr(bpl);
-  mnemonicToStr(brk);
+  if (oc->instruction == _brk) return "brk"; //mnemonicToStr(_brk);
   mnemonicToStr(bvc);
   mnemonicToStr(bvs);
   mnemonicToStr(clc);

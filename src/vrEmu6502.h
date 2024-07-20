@@ -12,6 +12,8 @@
 #ifndef _VR_EMU_6502_H_
 #define _VR_EMU_6502_H_
 
+#include <stdlib.h> // for NULL
+
 /* ------------------------------------------------------------------
  * LINKAGE MODES:
  * 
@@ -87,7 +89,7 @@ typedef enum
   FlagZ = 0x01 << BitZ,  /* zero */
   FlagI = 0x01 << BitI,  /* interrupt */
   FlagD = 0x01 << BitD,  /* decimal */
-  FlagB = 0x01 << BitB,  /* brk */
+  FlagB = 0x01 << BitB,  /* _brk */
   FlagU = 0x01 << BitU,  /* undefined */
   FlagV = 0x01 << BitV,  /* oVerflow */
   FlagN = 0x01 << BitN   /* negative */
@@ -133,7 +135,7 @@ typedef void(*vrEmu6502MemWrite)(uint16_t addr, uint8_t val);
   *        when isDbg is true.
   *        
   */
-typedef uint8_t(*vrEmu6502MemRead)(uint16_t addr, bool isDbg);
+typedef uint8_t(*vrEmu6502MemRead)(uint16_t addr/*, bool isDbg*/);
 
 
 /*
@@ -303,6 +305,200 @@ uint16_t vrEmu6502DisassembleInstruction(
   int bufferSize, char *buffer,
   uint16_t *refAddr, const char* const labelMap[0x10000]);
 
+/* ------------------------------------------------------------------
+ * PRIVATE DATA STRUCTURE
+ */
 
+ /*
+  * address mode function prototype
+  */
+typedef uint16_t(*vrEmu6502AddrModeFn)(VrEmu6502*);
+
+ /*
+  * instruction function prototype
+  */
+typedef void(*vrEmu6502InstructionFn)(VrEmu6502*, vrEmu6502AddrModeFn);
+
+struct vrEmu6502Opcode
+{
+  const vrEmu6502InstructionFn  instruction;
+  const vrEmu6502AddrModeFn     addrMode;
+  const uint8_t                 cycles;
+};
+typedef struct vrEmu6502Opcode vrEmu6502Opcode;
+
+struct vrEmu6502_s
+{
+  vrEmu6502Model model;
+  
+  vrEmu6502MemRead readFn;
+  vrEmu6502MemWrite writeFn;
+  
+  vrEmu6502Interrupt intPin;
+  vrEmu6502Interrupt nmiPin;
+
+  uint8_t step;
+  uint8_t inNmi;
+  uint8_t currentOpcode;
+  uint16_t currentOpcodeAddr;
+  uint8_t wai;
+
+  uint16_t pc;
+
+  uint8_t  ac;
+  uint8_t  ix;
+  uint8_t  iy;
+  uint8_t  sp;
+
+  uint8_t  flags;
+
+  uint16_t zpBase;
+  uint16_t spBase;
+  uint16_t tmpAddr;
+  uint8_t jam;
+
+  const vrEmu6502Opcode *opcodes;
+  const char* mnemonicNames[256];
+  vrEmu6502AddrMode addrModes[256];
+};
+ 
+/* ------------------------------------------------------------------
+ *  ADDRESS MODES
+ * ----------------------------------------------------------------*/
+
+uint16_t ab(VrEmu6502* vr6502);
+uint16_t abx(VrEmu6502* vr6502);
+uint16_t aby(VrEmu6502* vr6502);
+uint16_t axp(VrEmu6502* vr6502);
+uint16_t ayp(VrEmu6502* vr6502);
+uint16_t imm(VrEmu6502* vr6502);
+uint16_t ind(VrEmu6502* vr6502);
+uint16_t indx(VrEmu6502* vr6502);
+uint16_t rel(VrEmu6502* vr6502);
+uint16_t xin(VrEmu6502* vr6502);
+uint16_t yin(VrEmu6502* vr6502);
+uint16_t yip(VrEmu6502* vr6502);
+uint16_t zp(VrEmu6502* vr6502);
+uint16_t zpi(VrEmu6502* vr6502);
+uint16_t zpx(VrEmu6502* vr6502);
+uint16_t zpy(VrEmu6502* vr6502);
+
+/*
+ * accumulator mode (no address) - eg. ror
+ */
+#define acc NULL
+
+/*
+ * implied mode (no address) - eg. tax
+ */
+#define imp NULL
+
+/* ------------------------------------------------------------------
+ *  INSTRUCTIONS
+ * ----------------------------------------------------------------*/
+
+void adc(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void and(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void asl(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void bra(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void bcc(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void bcs(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void beq(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void bit(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void bmi(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void bne(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void bpl(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void _brk(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void bvc(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void bvs(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void clc(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void cld(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void cli(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void clv(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void cmp(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void cpx(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void cpy(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void dec(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void dex(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void dey(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void eor(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void inc(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void inx(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void iny(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void jmp(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void jsr(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void lda(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void ldx(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void ldy(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void lsr(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void nop(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void ldd(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void ora(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void pha(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void php(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void phx(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void phy(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void pla(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void plp(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void plx(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void ply(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void rol(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void ror(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void rti(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void rts(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void sbc(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void sec(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void sed(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void sei(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void sta(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void stx(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void sty(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void stz(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void tax(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void tay(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void tsx(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void txa(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void txs(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void tya(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void trb(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void tsb(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void rmb(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr, int bitIndex);
+void rmb0(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void rmb1(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void rmb2(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void rmb3(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void rmb4(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void rmb5(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void rmb6(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void rmb7(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void smb(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr, int bitIndex);
+void smb0(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void smb1(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void smb2(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void smb3(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void smb4(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void smb5(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void smb6(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void smb7(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void bbr(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr, int bitIndex);
+void bbr0(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void bbr1(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void bbr2(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void bbr3(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void bbr4(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void bbr5(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void bbr6(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void bbr7(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void bbs(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr, int bitIndex);
+void bbs0(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void bbs1(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void bbs2(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void bbs3(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void bbs4(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void bbs5(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void bbs6(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void bbs7(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void stp(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
+void wai(VrEmu6502* vr6502, vrEmu6502AddrModeFn modeAddr);
 
 #endif // _VR_EMU_6502_CORE_H_
