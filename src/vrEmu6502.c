@@ -421,10 +421,12 @@ VR_EMU_6502_DLLEXPORT int vrEmu6502RunCycles(VrEmu6502* vr6502, int n, int *cycl
     const vrEmu6502Opcode* opcode = &vr6502->opcodes[vr6502->currentOpcode];
 
     /* set cycles here as they may be adjusted by addressing mode */
-    j += opcode->cycles;
+    vr6502->step = opcode->cycles;
 
     /* execute the instruction */
     opcode->instruction(vr6502, opcode->addrMode);
+
+    j += vr6502->step;
   }
 
   *cycles = j;
